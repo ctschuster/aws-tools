@@ -1,0 +1,84 @@
+#!/usr/bin/env python
+
+import boto3
+import json
+import os
+import sys
+
+
+########################################################################
+class ServerList:
+  '''EC2 server list'''
+
+  changed    = False
+  configfile = None
+  servers    = None
+
+# record format: {<short-name>: {'instance-id': <instance-id>}}
+# for example:   {'dev':        {'instance-id': 'i-123456789abcdef01'}}
+
+  def __init__(self, file):
+    self.configfile = file
+    if (os.path.isfile(self.configfile)):
+      self.changed = False
+      with open(self.configfile) as json_file:
+        self.servers = json.load(json_file)
+
+    else:
+      self.changed = True
+      self.servers = {}
+
+  def show(self):
+    json.dump(self.servers, sys.stdout, sort_keys=True)
+
+  def add(self, short_name, instance_id):
+    self.servers[short_name] = { 'instance_id' : instance_id }
+    self.changed = True
+
+  def rm(self, short_name):
+    if short_name in self.servers:
+      del self.servers[short_name]
+      self.changed = True
+
+  def list(self):
+    print("Server          ")
+    print("----------------")
+    if (len(self.servers) > 0):
+      for k in sorted(self.servers):
+        print(k)
+    else:
+      print("**none**")
+
+  def update_config(self):
+    if (self.changed):
+      with open(self.configfile, 'w') as json_file:
+        json.dump(self.servers, json_file, sort_keys=True)
+
+
+########################################################################
+def help():
+  "show usage information"
+  print("usage:  server <action> [...]")
+
+
+########################################################################
+progname = sys.argv.pop(0)
+action   = sys.argv.pop(0)
+
+configfile = os.environ["HOME"] + '/.ec2servers'
+serverlist = ServerList(configfile)
+
+if (action == 'show'):
+  serverlist.show()
+elif (action == 'add'):
+  short_name  = input("Enter short name:  ")
+  instance_id = input("Enter instance id: ")
+  serverlist.add(short_name, instance_id)
+elif (action == 'rm'):
+  serverlist.rm(sys.argv[0])
+elif (action == 'list'):
+  serverlist.list()
+else:
+  help()
+
+serverlist.update_config()
